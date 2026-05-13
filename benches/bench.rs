@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::{hint::black_box, time::SystemTime};
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 use iso8601_timestamp::Timestamp as IsoTimestamp;
 use rfc3339_fast::{Buffer, Timestamp};
 

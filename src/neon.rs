@@ -1,6 +1,6 @@
 use core::arch::aarch64::{
-    uint8x16_t, uint8x16x2_t, uint16x8_t, uint32x4_t, vandq_u8, vcgtq_u8, vcltq_u8, vget_high_u8,
-    vget_lane_u64, vget_low_u8, vget_low_u16, vld1q_u8, vld1q_u16, vmaxvq_u8, vmovl_u8,
+    uint16x8_t, uint32x4_t, uint8x16_t, uint8x16x2_t, vandq_u8, vcgtq_u8, vcltq_u8, vget_high_u8,
+    vget_lane_u64, vget_low_u16, vget_low_u8, vld1q_u16, vld1q_u8, vmaxvq_u8, vmovl_u8,
     vmull_high_u16, vmull_u16, vmulq_u16, vpaddq_u32, vqaddq_u16, vqtbl2q_u8, vreinterpret_u64_u8,
     vreinterpretq_u16_u8, vshrn_n_u16, vst1q_u16, vst1q_u32, vsubq_u8, vuzp1q_u16, vuzp2q_u16,
 };

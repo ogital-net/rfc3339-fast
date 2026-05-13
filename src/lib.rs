@@ -541,10 +541,7 @@ impl Copy for Buffer {}
 // empty buffer, which matches the typical usage pattern (a `Buffer` is
 // always reset before each `format` call). The two clippy lints below
 // flag the unusual semantics on purpose; we accept them.
-#[allow(
-    clippy::non_canonical_clone_impl,
-    clippy::expl_impl_clone_on_copy
-)]
+#[allow(clippy::non_canonical_clone_impl, clippy::expl_impl_clone_on_copy)]
 impl Clone for Buffer {
     #[inline]
     fn clone(&self) -> Self {
@@ -966,7 +963,9 @@ impl Buffer {
         // SAFETY: `MaybeUninit<u8>` and `u8` have identical layout, and the
         // bytes are initialized (above). All writes use ASCII exclusively.
         unsafe {
-            core::str::from_utf8_unchecked(&*(ptr::from_ref::<[MaybeUninit<u8>]>(written) as *const [u8]))
+            core::str::from_utf8_unchecked(
+                &*(ptr::from_ref::<[MaybeUninit<u8>]>(written) as *const [u8]),
+            )
         }
     }
 }
@@ -992,7 +991,11 @@ fn atoi_consume(ascii: &mut &[u8]) -> i32 {
     }
 
     *ascii = &s[idx..];
-    if neg { n } else { -n }
+    if neg {
+        n
+    } else {
+        -n
+    }
 }
 
 /// Decodes the seconds component from an ISO8601 timestamp string.
@@ -1185,9 +1188,7 @@ fn jsondec_epochdays(y: i32, m: i32, d: i32) -> i32 {
 /// # Returns
 ///
 /// The number of seconds since the Unix epoch (1970-01-01T00:00:00Z).
-#[allow(
-    clippy::many_single_char_names
-)]
+#[allow(clippy::many_single_char_names)]
 fn jsondec_unixtime(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64 {
     i64::from(jsondec_epochdays(y, m, d)) * 86400
         + i64::from(h) * 3600
@@ -1197,7 +1198,7 @@ fn jsondec_unixtime(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use serde_test::{Token, assert_tokens};
+    use serde_test::{assert_tokens, Token};
     use std::time::Duration;
 
     use super::*;
@@ -1402,7 +1403,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_de_bytes() {
-        use serde_test::{Token, assert_de_tokens, assert_de_tokens_error};
+        use serde_test::{assert_de_tokens, assert_de_tokens_error, Token};
 
         let ts: Timestamp = "2026-02-26T00:31:30.042Z".parse().unwrap();
         assert_de_tokens(&ts, &[Token::Bytes(b"2026-02-26T00:31:30.042Z")]);
