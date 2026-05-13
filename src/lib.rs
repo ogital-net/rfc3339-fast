@@ -1196,7 +1196,7 @@ fn jsondec_unixtime(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64 {
         + i64::from(s)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std", feature = "serde"))]
 mod tests {
     use serde_test::{assert_tokens, Token};
     use std::time::Duration;

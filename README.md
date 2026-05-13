@@ -1,5 +1,9 @@
 # RFC3339 Timestamp Library
 
+[![crates.io](https://img.shields.io/crates/v/rfc3339-fast.svg)](https://crates.io/crates/rfc3339-fast)
+[![docs.rs](https://docs.rs/rfc3339-fast/badge.svg)](https://docs.rs/rfc3339-fast)
+[![license](https://img.shields.io/crates/l/rfc3339-fast.svg)](LICENSE)
+
 A high-performance Rust library for parsing and formatting RFC3339 timestamps with support for nanosecond precision.
 
 ## Features
