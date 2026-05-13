@@ -1,4 +1,4 @@
-# RFC3339 Timestamp Library
+# rfc3339-fast
 
 [![crates.io](https://img.shields.io/crates/v/rfc3339-fast.svg)](https://crates.io/crates/rfc3339-fast)
 [![docs.rs](https://docs.rs/rfc3339-fast/badge.svg)](https://docs.rs/rfc3339-fast)
@@ -23,7 +23,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rfc3339-fast = "0.1"
+rfc3339-fast = "0.2"
 ```
 
 ### Optional Features
