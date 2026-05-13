@@ -543,8 +543,7 @@ impl Copy for Buffer {}
 // flag the unusual semantics on purpose; we accept them.
 #[allow(
     clippy::non_canonical_clone_impl,
-    clippy::expl_impl_clone_on_copy,
-    reason = "intentional non-canonical Clone: returns a fresh empty buffer instead of copying uninitialized tail bytes"
+    clippy::expl_impl_clone_on_copy
 )]
 impl Clone for Buffer {
     #[inline]
@@ -967,7 +966,7 @@ impl Buffer {
         // SAFETY: `MaybeUninit<u8>` and `u8` have identical layout, and the
         // bytes are initialized (above). All writes use ASCII exclusively.
         unsafe {
-            str::from_utf8_unchecked(&*(ptr::from_ref::<[MaybeUninit<u8>]>(written) as *const [u8]))
+            core::str::from_utf8_unchecked(&*(ptr::from_ref::<[MaybeUninit<u8>]>(written) as *const [u8]))
         }
     }
 }
@@ -1187,8 +1186,7 @@ fn jsondec_epochdays(y: i32, m: i32, d: i32) -> i32 {
 ///
 /// The number of seconds since the Unix epoch (1970-01-01T00:00:00Z).
 #[allow(
-    clippy::many_single_char_names,
-    reason = "y/m/d/h/s match the field names used throughout the algorithm and the F/VF literature"
+    clippy::many_single_char_names
 )]
 fn jsondec_unixtime(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64 {
     i64::from(jsondec_epochdays(y, m, d)) * 86400

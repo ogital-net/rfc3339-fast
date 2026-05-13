@@ -2,23 +2,33 @@ name: CI
 
 on:
   push:
-    branches: [ main]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   lint-build-test:
-    runs-on: ${{ matrix.os }} 
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15]
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-15
+          - windows-2025
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust toolchain and components
-        uses: actions-rs/toolchain@v1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: clippy, rustfmt
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -26,12 +36,54 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-
+
       - name: Check formatting
         run: cargo fmt --all -- --check
-      - name: Run clippy (deny warnings)
+
+      - name: Run clippy (all features)
         run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Run tests
+
+      - name: Run clippy (no default features)
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
+
+      - name: Build (all features)
+        run: cargo build --workspace --all-features --verbose
+
+      - name: Build (no default features)
+        run: cargo build --workspace --no-default-features --verbose
+
+      - name: Run tests (all features)
         run: cargo test --workspace --all-features --verbose
+
+      - name: Run tests (no default features)
+        run: cargo test --workspace --no-default-features --verbose
+
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --all-features
+
+  msrv:
+    name: MSRV (1.81)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.81
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-msrv-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build (all features)
+        run: cargo build --all-features --verbose
+
+      - name: Build (no default features)
+        run: cargo build --no-default-features --verbose

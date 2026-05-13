@@ -69,7 +69,7 @@ pub(super) unsafe fn decode_seconds(ascii: &mut &[u8]) -> Result<i64, TimestampE
 
         let tmp = maddubs_neon(tmp, mult_10);
 
-        let mut res: [u8; 16] = [0u8; _];
+        let mut res: [u8; 16] = [0u8; 16];
         vst1q_u16(res.as_mut_ptr().cast(), tmp);
 
         let year = res[0] as i32 * 100 + res[2] as i32;
@@ -93,8 +93,8 @@ pub(super) unsafe fn decode_nanos(ascii: &mut &[u8]) -> Result<i32, TimestampErr
         return Ok(0);
     }
 
-    const ASCII_ZERO: [u8; 16] = [b'0'; _];
-    const DIGIT_MAX: [u8; 16] = [10; _];
+    const ASCII_ZERO: [u8; 16] = [b'0'; 16];
+    const DIGIT_MAX: [u8; 16] = [10; 16];
 
     const THREE_DIGITS: u64 = 0x0000_0000_0000_FFF0;
     const SIX_DIGITS: u64 = 0x0000_0000_FFF0_FFF0;
@@ -157,7 +157,7 @@ pub(super) unsafe fn decode_nanos(ascii: &mut &[u8]) -> Result<i32, TimestampErr
         let tmp = maddubs_neon(tmp, vld1q_u8(MULT_100_10.as_ptr()));
         let tmp = madd_neon(tmp, vld1q_u16(MULT_1000.as_ptr()));
 
-        let mut out: [i32; 4] = [0; _];
+        let mut out: [i32; 4] = [0; 4];
         vst1q_u32(out.as_mut_ptr().cast(), tmp);
 
         *ascii = &ascii[offset..];
@@ -174,9 +174,11 @@ pub(super) unsafe fn decode_nanos(ascii: &mut &[u8]) -> Result<i32, TimestampErr
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn maddubs_neon(a: uint8x16_t, b: uint8x16_t) -> uint16x8_t {
-    let tl = vmulq_u16(vmovl_u8(vget_low_u8(a)), vmovl_u8(vget_low_u8(b)));
-    let th = vmulq_u16(vmovl_u8(vget_high_u8(a)), vmovl_u8(vget_high_u8(b)));
-    vqaddq_u16(vuzp1q_u16(tl, th), vuzp2q_u16(tl, th))
+    unsafe {
+        let tl = vmulq_u16(vmovl_u8(vget_low_u8(a)), vmovl_u8(vget_low_u8(b)));
+        let th = vmulq_u16(vmovl_u8(vget_high_u8(a)), vmovl_u8(vget_high_u8(b)));
+        vqaddq_u16(vuzp1q_u16(tl, th), vuzp2q_u16(tl, th))
+    }
 }
 
 /// Multiplies and then horizontally add signed 16 bit integers in `a` and `b`.
@@ -187,10 +189,12 @@ unsafe fn maddubs_neon(a: uint8x16_t, b: uint8x16_t) -> uint16x8_t {
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn madd_neon(a: uint16x8_t, b: uint16x8_t) -> uint32x4_t {
-    let low = vmull_u16(vget_low_u16(a), vget_low_u16(b));
-    let high = vmull_high_u16(a, b);
+    unsafe {
+        let low = vmull_u16(vget_low_u16(a), vget_low_u16(b));
+        let high = vmull_high_u16(a, b);
 
-    vpaddq_u32(low, high)
+        vpaddq_u32(low, high)
+    }
 }
 
 /// Packs the most significant bit of each byte in `input` into a 64-bit
@@ -207,8 +211,10 @@ unsafe fn madd_neon(a: uint16x8_t, b: uint16x8_t) -> uint32x4_t {
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn neon_nibblemask(input: uint8x16_t) -> u64 {
-    let narrowed = vshrn_n_u16::<4>(vreinterpretq_u16_u8(input));
-    vget_lane_u64::<0>(vreinterpret_u64_u8(narrowed))
+    unsafe {
+        let narrowed = vshrn_n_u16::<4>(vreinterpretq_u16_u8(input));
+        vget_lane_u64::<0>(vreinterpret_u64_u8(narrowed))
+    }
 }
 
 #[cfg(test)]
