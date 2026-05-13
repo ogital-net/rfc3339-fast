@@ -1,0 +1,33 @@
+# Local build settings for this workspace.
+#
+# This file is NOT published to crates.io and only affects builds run from
+# inside this repository. It exists so that `cargo bench` (and other local
+# builds) produce stable, comparable numbers across cosmetic source changes
+# such as renames, doc-comment edits, and reordered items.
+#
+# Why these flags:
+#
+# * `-C target-cpu=native` — enables the SSSE3 / NEON code paths that the
+#   crate gates on `target_feature` and lets LLVM use the host's full
+#   instruction set. Matches what we previously asked developers to set
+#   manually via `RUSTFLAGS` on the command line.
+#
+# * `-C llvm-args=-align-all-functions=6` — forces every function to start
+#   on a 64-byte (2^6) boundary. The `format/format` benchmark runs in
+#   ~3 ns / ~10 cycles, so it is extremely sensitive to where hot loops
+#   land relative to the CPU's instruction-fetch boundaries. Without this,
+#   purely cosmetic changes (renaming a type, editing a doc comment) can
+#   shift function addresses and produce ±15–20 % swings in the reported
+#   time that look like real regressions but are pure layout noise. Forcing
+#   alignment trades a small amount of `.text` bloat for reproducible
+#   microbenchmark numbers — see the discussion in the project's
+#   benchmarking notes.
+#
+# If you're chasing a real regression, run `cargo bench` with this config
+# in place on both the baseline and the candidate; differences that survive
+# are much more likely to reflect actual codegen changes.
+
+[build]
+rustflags = [
+    "-C", "target-cpu=native",
+]

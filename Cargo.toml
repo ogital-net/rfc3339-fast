@@ -1,0 +1,50 @@
+[package]
+name = "rfc3339-fast"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.87"
+description = "High-performance ISO8601/RFC3339 timestamp parsing and formatting for JSON, with optional SIMD acceleration."
+license = "BSD-2-Clause"
+repository = "https://github.com/ogital-net/rfc3339-fast"
+documentation = "https://docs.rs/rfc3339-fast"
+readme = "README.md"
+keywords = ["json", "timestamp", "iso8601", "rfc3339", "simd"]
+categories = ["date-and-time", "encoding", "parser-implementations"]
+include = [
+    "src/**/*.rs",
+    "benches/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
+chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
+serde_core = { version = "1", optional = true, default-features = false }
+
+[features]
+default = ["std", "serde"]
+# Enables `std`-dependent APIs: `Timestamp::now`, `From<SystemTime>`,
+# `From<&SystemTime>`, `From<Timestamp> for SystemTime`, and the
+# `std::error::Error` impl for `TimestampError`. Without this feature the
+# crate is `#![no_std]` and operates entirely on `(i64 seconds, u32 nanos)`.
+std = ["serde_core?/std"]
+chrono = ["dep:chrono", "std"]
+serde = ["dep:serde_core"]
+
+[dev-dependencies]
+criterion = { version = "0.7", features = ["html_reports"] }
+chrono = "0.4"
+iso8601-timestamp = "0.4"
+serde_test = "1"
+
+
+[[bench]]
+name = "bench"
+path = "benches/bench.rs"
+harness = false
+
+
+[profile.release]
+lto = true
+codegen-units = 1
