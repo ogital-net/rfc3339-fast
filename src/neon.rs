@@ -9,10 +9,7 @@ use crate::TimestampError;
 
 #[target_feature(enable = "neon")]
 pub(super) unsafe fn decode_seconds(ascii: &mut &[u8]) -> Result<i64, TimestampError> {
-    const LOWER_BOUND: [u8; 16] = [
-        b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'0', b'T',
-        b':',
-    ];
+    const LOWER_BOUND: [u8; 16] = *b"00000000000000T:";
 
     const UPPER_BOUND: [u8; 16] = [
         9, 9, 9, 9, // Year
