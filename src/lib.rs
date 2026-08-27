@@ -1513,8 +1513,7 @@ mod postgres_tests {
 
             // Verify the wire format matches what we expect: microseconds
             // since Postgres epoch, big-endian.
-            let micros = (secs - POSTGRES_EPOCH_UNIX_SECS) * 1_000_000
-                + i64::from(nanos / 1_000);
+            let micros = (secs - POSTGRES_EPOCH_UNIX_SECS) * 1_000_000 + i64::from(nanos / 1_000);
             assert_eq!(
                 buf.as_ref(),
                 micros.to_be_bytes().as_ref(),
@@ -1523,7 +1522,10 @@ mod postgres_tests {
 
             // And round-trip back.
             let back = Timestamp::from_sql(&Type::TIMESTAMPTZ, &buf).unwrap();
-            assert_eq!(back, ts, "round-trip mismatch for secs={secs} nanos={nanos}");
+            assert_eq!(
+                back, ts,
+                "round-trip mismatch for secs={secs} nanos={nanos}"
+            );
         }
     }
 

@@ -64,10 +64,7 @@ impl ToSql for Timestamp {
 }
 
 impl<'a> FromSql<'a> for Timestamp {
-    fn from_sql(
-        _ty: &Type,
-        raw: &'a [u8],
-    ) -> Result<Self, Box<dyn Error + Sync + Send>> {
+    fn from_sql(_ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
         if raw.len() != 8 {
             return Err(format!(
                 "invalid timestamptz length: expected 8 bytes, got {}",
