@@ -14,6 +14,7 @@ A high-performance Rust library for parsing and formatting RFC3339 timestamps wi
 - **SystemTime integration**: Direct conversion to/from `std::time::SystemTime`
 - **Chrono support**: Optional integration with the `chrono` crate via the `chrono` feature
 - **Serde support**: Optional serialization/deserialization support via the `serde` feature
+- **Postgres support**: Optional `tokio-postgres` / `postgres` integration via the `postgres` feature, mapping to `TIMESTAMP WITH TIME ZONE`
 - **SIMD acceleration**: Automatic optimization for platforms supporting SSSE3 (x86/x86_64) or NEON (ARM)
 - **Efficient parsing**: Fast parsing of RFC3339/ISO8601 timestamps
 
@@ -37,6 +38,12 @@ The default feature set is `["std", "serde"]`. Available features:
 - `serde` (default) — enables `Serialize`/`Deserialize` for `Timestamp`.
 - `chrono` — enables conversions from `chrono::DateTime<Tz>` to `Timestamp`
   (implies `std`).
+- `postgres` — enables `ToSql` / `FromSql` for `Timestamp` so it can be used
+  directly with `tokio-postgres`, `postgres`, and connection pools built on
+  top (such as `deadpool-postgres`). The value maps to Postgres
+  `TIMESTAMP WITH TIME ZONE` (`timestamptz`). Sub-microsecond nanoseconds
+  are truncated to microsecond precision on encode; out-of-range values
+  yield `TimestampError::OutOfRange` on decode (implies `std`).
 
 For example, to enable `chrono` alongside the defaults:
 
@@ -131,6 +138,26 @@ struct Event {
 let json = r#"{"name": "event", "timestamp": "2026-02-25T14:30:00Z"}"#;
 let event: Event = serde_json::from_str(json)?;
 ```
+
+### With tokio-postgres (requires `postgres` feature)
+
+`Timestamp` implements `ToSql` and `FromSql` and maps to Postgres
+`TIMESTAMP WITH TIME ZONE` (`timestamptz`), so it can be used directly as
+a parameter or row column with `tokio-postgres`:
+
+```rust,ignore
+use rfc3339_fast::Timestamp;
+use tokio_postgres::types::Type;
+
+let ts = Timestamp::now();
+let row = client
+    .query_one("SELECT $1::timestamptz", &[&ts])
+    .await?;
+let back: Timestamp = row.get(0);
+```
+
+Postgres stores `timestamptz` at microsecond precision, so any
+sub-microsecond nanoseconds in a `Timestamp` are truncated on encode.
 
 ## Timestamp Format
 

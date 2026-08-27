@@ -14,6 +14,7 @@
 //! - `no_std` support by disabling default features
 //! - Optional support for `chrono` types via the `chrono` feature
 //! - Optional `serde` integration via the `serde` feature
+//! - Optional `tokio-postgres` / `postgres` integration via the `postgres` feature
 //! - SIMD acceleration on platforms supporting SSSE3 (`x86`/`x86_64`) or NEON (ARM)
 //!
 //! ## Examples
@@ -80,6 +81,15 @@ mod sse;
 
 #[cfg(target_feature = "neon")]
 mod neon;
+
+#[cfg(feature = "chrono")]
+mod chrono_impl;
+
+#[cfg(feature = "serde")]
+mod serde_impl;
+
+#[cfg(feature = "postgres")]
+mod postgres_impl;
 
 /// Error type for parsing or formatting JSON timestamps.
 ///
@@ -312,82 +322,6 @@ impl From<&Timestamp> for Timestamp {
     #[inline]
     fn from(value: &Timestamp) -> Self {
         *value
-    }
-}
-
-#[cfg(feature = "chrono")]
-impl<Tz: chrono::TimeZone> From<chrono::DateTime<Tz>> for Timestamp {
-    fn from(value: chrono::DateTime<Tz>) -> Self {
-        // chrono's `timestamp()` returns signed Unix seconds and
-        // `timestamp_subsec_nanos()` returns nanos in [0, 1e9), so this
-        // already matches our canonical form — no SystemTime detour.
-        // Saturate to the `Timestamp` range to uphold its invariant.
-        let seconds = value.timestamp();
-        let nanos = value.timestamp_subsec_nanos();
-        if seconds < SECONDS_MIN {
-            Self::new_unchecked(SECONDS_MIN, 0)
-        } else if seconds > SECONDS_MAX {
-            Self::new_unchecked(SECONDS_MAX, 0)
-        } else {
-            Self::new_unchecked(seconds, nanos)
-        }
-    }
-}
-
-#[cfg(feature = "chrono")]
-impl From<Timestamp> for chrono::DateTime<chrono::Utc> {
-    fn from(value: Timestamp) -> Self {
-        chrono::DateTime::<chrono::Utc>::from_timestamp(value.seconds, value.nanos)
-            .expect("Timestamp out of range for chrono::DateTime")
-    }
-}
-
-#[cfg(feature = "serde")]
-impl serde_core::Serialize for Timestamp {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde_core::Serializer,
-    {
-        let mut buf = Buffer::new();
-        serializer.serialize_str(buf.format(self))
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde_core::Deserialize<'de> for Timestamp {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde_core::Deserializer<'de>,
-    {
-        struct TsVisitor;
-
-        impl serde_core::de::Visitor<'_> for TsVisitor {
-            type Value = Timestamp;
-
-            #[inline]
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("an ISO8601 Timestamp")
-            }
-
-            #[inline]
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde_core::de::Error,
-            {
-                Timestamp::from_str(v).map_err(|_e| E::custom("Invalid Format"))
-            }
-
-            #[inline]
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: serde_core::de::Error,
-            {
-                let s = core::str::from_utf8(v).map_err(|_| E::custom("Invalid Format"))?;
-                self.visit_str(s)
-            }
-        }
-        deserializer.deserialize_str(TsVisitor)
     }
 }
 
@@ -1540,5 +1474,135 @@ mod tests {
     #[test]
     fn test_buffer_size() {
         assert_eq!(core::mem::size_of::<Buffer>(), 32);
+    }
+}
+
+/// Tests for the optional `postgres` feature. Round-trips a `Timestamp`
+/// through `ToSql`/`FromSql` using only the in-memory `BytesMut` / `&[u8]`
+/// representations — no live Postgres server required.
+#[cfg(all(test, feature = "postgres"))]
+mod postgres_tests {
+    use bytes::BytesMut;
+    use postgres_types::{FromSql, ToSql, Type};
+
+    use super::Timestamp;
+    use crate::postgres_impl::POSTGRES_EPOCH_UNIX_SECS;
+
+    /// Round-trips microsecond-aligned values via `to_sql` / `from_sql` and
+    /// verifies the byte encoding matches what we expect on the wire.
+    #[test]
+    fn test_postgres_roundtrip() {
+        let cases: &[(i64, u32)] = &[
+            // epoch
+            (0, 0),
+            // a representative modern instant
+            (1_772_029_800, 0),
+            // microsecond-aligned fractional second
+            (1_772_029_800, 123_456_000),
+            // year-1 lower bound (Timestamp range)
+            (-62_135_596_800, 0),
+            // year-9999 upper bound
+            (253_402_300_799, 999_999_000),
+        ];
+        for &(secs, nanos) in cases {
+            let ts = Timestamp::from_unix(secs, nanos).unwrap();
+
+            let mut buf = BytesMut::new();
+            ts.to_sql(&Type::TIMESTAMPTZ, &mut buf).unwrap();
+            assert_eq!(buf.len(), 8, "expected 8-byte timestamptz encoding");
+
+            // Verify the wire format matches what we expect: microseconds
+            // since Postgres epoch, big-endian.
+            let micros = (secs - POSTGRES_EPOCH_UNIX_SECS) * 1_000_000
+                + i64::from(nanos / 1_000);
+            assert_eq!(
+                buf.as_ref(),
+                micros.to_be_bytes().as_ref(),
+                "encoding mismatch for secs={secs} nanos={nanos}",
+            );
+
+            // And round-trip back.
+            let back = Timestamp::from_sql(&Type::TIMESTAMPTZ, &buf).unwrap();
+            assert_eq!(back, ts, "round-trip mismatch for secs={secs} nanos={nanos}");
+        }
+    }
+
+    /// Sub-microsecond nanoseconds are truncated on encode and re-padded on
+    /// decode. Verify that contract rather than masking it.
+    #[test]
+    fn test_postgres_submicrosecond_truncation() {
+        let ts = Timestamp::from_unix(1_772_029_800, 123_456_789).unwrap();
+
+        let mut buf = BytesMut::new();
+        ts.to_sql(&Type::TIMESTAMPTZ, &mut buf).unwrap();
+
+        let back = Timestamp::from_sql(&Type::TIMESTAMPTZ, &buf).unwrap();
+        // The bottom 3 digits of `nanos` are dropped by the µs encoding.
+        assert_eq!(back.subsec_nanos(), 123_456_000);
+        assert_ne!(back, ts);
+    }
+
+    /// Pre-1970 / pre-2000 timestamps exercise the `div_euclid` /
+    /// `rem_euclid` branches in `FromSql`. A naive `/` and `%` would put
+    /// `nanos` negative and `secs` off-by-one.
+    #[test]
+    fn test_postgres_pre_epoch_decode() {
+        // 1969-12-31T23:00:00Z — Unix seconds = -3600. Postgres epoch is
+        // 2000-01-01 = Unix seconds 946_684_800, so microseconds since
+        // Postgres epoch for this instant is
+        // `(-3600 - 946_684_800) * 1_000_000 = -946_688_400_000_000`.
+        let micros: i64 = -946_688_400_000_000;
+        let bytes = micros.to_be_bytes();
+
+        let ts = Timestamp::from_sql(&Type::TIMESTAMPTZ, &bytes).unwrap();
+        assert_eq!(ts.seconds(), -3600);
+        assert_eq!(ts.subsec_nanos(), 0);
+    }
+
+    /// `accepts` admits `TIMESTAMPTZ` only — both `ToSql::accepts` and
+    /// `FromSql::accepts` (which both produce identical predicates here)
+    /// agree, and reject plain `TIMESTAMP`, `TEXT`, `INT8`, etc.
+    #[test]
+    fn test_postgres_accepts() {
+        // Both traits' `accepts` methods are otherwise ambiguous when
+        // resolved as `Timestamp::accepts`, so disambiguate via UFCS.
+        assert!(<Timestamp as ToSql>::accepts(&Type::TIMESTAMPTZ));
+        assert!(<Timestamp as FromSql>::accepts(&Type::TIMESTAMPTZ));
+        assert!(!<Timestamp as ToSql>::accepts(&Type::TIMESTAMP));
+        assert!(!<Timestamp as ToSql>::accepts(&Type::TEXT));
+        assert!(!<Timestamp as ToSql>::accepts(&Type::INT8));
+    }
+
+    /// `from_sql` rejects payloads that aren't exactly 8 bytes long.
+    #[test]
+    fn test_postgres_from_sql_bad_length() {
+        for bad_len in [0usize, 4, 7, 9, 16] {
+            let bytes = vec![0u8; bad_len];
+            let err = Timestamp::from_sql(&Type::TIMESTAMPTZ, &bytes)
+                .expect_err(&format!("should reject length {bad_len}"));
+            assert!(
+                err.to_string().contains("invalid timestamptz length"),
+                "unexpected error for length {bad_len}: {err}",
+            );
+        }
+    }
+
+    /// Out-of-range values (year 0 or year 10000) are rejected rather
+    /// than silently saturated. We compute the exact underflow boundary
+    /// rather than guessing.
+    #[test]
+    fn test_postgres_from_sql_out_of_range() {
+        // `Timestamp` range starts at `SECONDS_MIN = -62_135_596_800`
+        // Unix seconds. Anything one second before that translates to a
+        // Postgres microsecond value one µs below this:
+        let underflow_secs = -62_135_596_800_i64 - 1;
+        let underflow_micros = (underflow_secs - POSTGRES_EPOCH_UNIX_SECS) * 1_000_000;
+        let bytes = underflow_micros.to_be_bytes();
+        let err = Timestamp::from_sql(&Type::TIMESTAMPTZ, &bytes).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("out of range") || msg.contains("OutOfRange"),
+            "expected out-of-range error, got: {msg}",
+        );
     }
 }

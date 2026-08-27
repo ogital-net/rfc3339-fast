@@ -19,7 +19,9 @@ include = [
 ]
 
 [dependencies]
+bytes = { version = "1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
+postgres-types = { version = "0.2", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
 
 [features]
@@ -30,6 +32,7 @@ default = ["std", "serde"]
 # crate is `#![no_std]` and operates entirely on `(i64 seconds, u32 nanos)`.
 std = ["serde_core?/std"]
 chrono = ["dep:chrono", "std"]
+postgres = ["dep:bytes", "dep:postgres-types", "std"]
 serde = ["dep:serde_core"]
 
 [dev-dependencies]
