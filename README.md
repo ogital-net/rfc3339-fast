@@ -24,7 +24,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rfc3339-fast = "0.2"
+rfc3339-fast = "0.3"
 ```
 
 ### Optional Features
@@ -49,14 +49,14 @@ For example, to enable `chrono` alongside the defaults:
 
 ```toml
 [dependencies]
-rfc3339-fast = { version = "0.1", features = ["chrono"] }
+rfc3339-fast = { version = "0.3", features = ["chrono"] }
 ```
 
 For a `no_std` build without `serde`:
 
 ```toml
 [dependencies]
-rfc3339-fast = { version = "0.1", default-features = false }
+rfc3339-fast = { version = "0.3", default-features = false }
 ```
 
 ## Usage
