@@ -171,7 +171,8 @@ pub(super) unsafe fn decode_nanos(ascii: &mut &[u8]) -> Result<i32, TimestampErr
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn maddubs_neon(a: uint8x16_t, b: uint8x16_t) -> uint16x8_t {
-    {
+    #[allow(unused_unsafe)]
+    unsafe {
         let tl = vmulq_u16(vmovl_u8(vget_low_u8(a)), vmovl_u8(vget_low_u8(b)));
         let th = vmulq_u16(vmovl_u8(vget_high_u8(a)), vmovl_u8(vget_high_u8(b)));
         vqaddq_u16(vuzp1q_u16(tl, th), vuzp2q_u16(tl, th))
@@ -186,7 +187,8 @@ unsafe fn maddubs_neon(a: uint8x16_t, b: uint8x16_t) -> uint16x8_t {
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn madd_neon(a: uint16x8_t, b: uint16x8_t) -> uint32x4_t {
-    {
+    #[allow(unused_unsafe)]
+    unsafe {
         let low = vmull_u16(vget_low_u16(a), vget_low_u16(b));
         let high = vmull_high_u16(a, b);
 
@@ -208,7 +210,8 @@ unsafe fn madd_neon(a: uint16x8_t, b: uint16x8_t) -> uint32x4_t {
 #[inline]
 #[target_feature(enable = "neon")]
 unsafe fn neon_nibblemask(input: uint8x16_t) -> u64 {
-    {
+    #[allow(unused_unsafe)]
+    unsafe {
         let narrowed = vshrn_n_u16::<4>(vreinterpretq_u16_u8(input));
         vget_lane_u64::<0>(vreinterpret_u64_u8(narrowed))
     }
